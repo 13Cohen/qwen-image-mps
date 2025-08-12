@@ -46,21 +46,34 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def get_lora_path():
-    """Get the Lightning LoRA from Hugging Face cache."""
-    from huggingface_hub import hf_hub_download
-
+    """Get the Lightning LoRA from ModelScope cache."""
     try:
-        # This will download to HF cache or return cached path
-        lora_path = hf_hub_download(
-            repo_id="lightx2v/Qwen-Image-Lightning",
-            filename="Qwen-Image-Lightning-8steps-V1.0.safetensors",
-            repo_type="model",
+        from modelscope import snapshot_download
+        
+        # 使用ModelScope下载Lightning LoRA
+        lora_path = snapshot_download(
+            model_id="lightx2v/Qwen-Image-Lightning",
+            cache_dir=None,  # 使用默认缓存目录
         )
-        print(f"Lightning LoRA loaded from: {lora_path}")
-        return lora_path
+        # 构建完整的LoRA文件路径
+        lora_file_path = f"{lora_path}/Qwen-Image-Lightning-8steps-V1.0.safetensors"
+        print(f"Lightning LoRA loaded from: {lora_file_path}")
+        return lora_file_path
     except Exception as e:
-        print(f"Failed to load Lightning LoRA: {e}")
-        return None
+        print(f"Failed to load Lightning LoRA from ModelScope: {e}")
+        print("Trying fallback to Hugging Face...")
+        try:
+            from huggingface_hub import hf_hub_download
+            lora_path = hf_hub_download(
+                repo_id="lightx2v/Qwen-Image-Lightning",
+                filename="Qwen-Image-Lightning-8steps-V1.0.safetensors",
+                repo_type="model",
+            )
+            print(f"Lightning LoRA loaded from Hugging Face: {lora_path}")
+            return lora_path
+        except Exception as e2:
+            print(f"Failed to load Lightning LoRA from Hugging Face: {e2}")
+            return None
 
 
 def merge_lora_from_safetensors(pipe, lora_path):
@@ -118,9 +131,10 @@ def main() -> None:
     import sys
 
     import torch
-    from diffusers import DiffusionPipeline
+    from modelscope import DiffusionPipeline
 
-    model_name = "Qwen/Qwen-Image"
+    # 使用ModelScope的模型ID
+    model_name = "qwen/Qwen-Image"
 
     # Select device and dtype correctly
     if torch.backends.mps.is_available():
@@ -136,7 +150,30 @@ def main() -> None:
         device = "cpu"
         torch_dtype = torch.float32
 
-    pipe = DiffusionPipeline.from_pretrained(model_name, torch_dtype=torch_dtype)
+    try:
+        # 首先尝试从ModelScope加载模型
+        print("Loading model from ModelScope...")
+        pipe = DiffusionPipeline.from_pretrained(
+            model_name, 
+            torch_dtype=torch_dtype,
+            use_safetensors=True
+        )
+        print("Model loaded successfully from ModelScope")
+    except Exception as e:
+        print(f"Failed to load model from ModelScope: {e}")
+        print("Trying fallback to Hugging Face...")
+        try:
+            # 如果ModelScope失败，回退到Hugging Face
+            fallback_model_name = "Qwen/Qwen-Image"
+            pipe = DiffusionPipeline.from_pretrained(
+                fallback_model_name, 
+                torch_dtype=torch_dtype
+            )
+            print("Model loaded successfully from Hugging Face")
+        except Exception as e2:
+            print(f"Failed to load model from both sources: {e2}")
+            sys.exit(1)
+
     pipe = pipe.to(device)
 
     # Apply Lightning LoRA if fast mode is enabled

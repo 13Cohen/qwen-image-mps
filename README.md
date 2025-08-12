@@ -17,6 +17,9 @@ Example result you can create with this project:
 
 ## Installation
 
+### Prerequisites
+This tool now uses ModelScope as the primary source for model downloads, which provides faster download speeds in many regions. If ModelScope is unavailable, it will automatically fall back to Hugging Face.
+
 ### Option 1: Install from PyPI (Recommended)
 
 Install the package using pip:
@@ -51,7 +54,7 @@ cd qwen-image-mps
 pip install -e .
 ```
 
-**Note:** The first time you run the tool, it will download the 57.7GB model from Hugging Face and store it in your `~/.cache/huggingface/hub/models--Qwen--Qwen-Image` directory.
+**Note:** The first time you run the tool, it will download the 57.7GB model from ModelScope (preferred) or Hugging Face as fallback. Models are stored in your cache directory for faster subsequent runs.
 
 ## Usage
 
@@ -95,7 +98,7 @@ If using the direct script with uv, replace `qwen-image-mps` with `uv run qwen-i
  - `--num-images` (int): Number of images to generate (default: 1).
 
 ## What the script does
-- Loads `Qwen/Qwen-Image` via `diffusers.DiffusionPipeline`
+- Loads `qwen/Qwen-Image` from ModelScope (preferred) or `Qwen/Qwen-Image` from Hugging Face as fallback via `diffusers.DiffusionPipeline`
 - Selects device and dtype:
   - MPS: `bfloat16`
   - CUDA: `bfloat16`
@@ -108,7 +111,7 @@ If using the direct script with uv, replace `qwen-image-mps` with `uv run qwen-i
 
 ### Fast Mode (Lightning LoRA)
 When using the `-f/--fast` flag, the tool:
-- Automatically downloads the Lightning LoRA from Hugging Face (cached in `~/.cache/huggingface/hub/`)
+- Automatically downloads the Lightning LoRA from ModelScope (preferred) or Hugging Face as fallback
 - Merges the LoRA weights into the model for accelerated generation
 - Uses fixed 8 inference steps with CFG scale 1.0
 - Provides ~6x speedup compared to the default 50 steps
